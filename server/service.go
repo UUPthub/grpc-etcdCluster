@@ -7,7 +7,11 @@ import (
 	"grpc-etcd/pb"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 )
+
+var c = make(chan os.Signal)
 
 type student struct {
 	pb.FindTeacherServer
@@ -25,6 +29,8 @@ func (s *student) SayTeacher(c context.Context, stu *pb.Student) (*pb.Teacher, e
 
 func CreateService() {
 	prefix, addr := "/etcd", "192.168.1.51:8800"
+	signal.Notify(c)
+
 	srv, err := NewServiceRegister(prefix, addr, 5)
 	if err != nil {
 		log.Println(err)
@@ -38,5 +44,18 @@ func CreateService() {
 		log.Println(err)
 	}
 	log.Println("grpc server start~~~")
+
+	go func() {
+		for {
+			select {
+			case <-c:
+				err := srv.Close()
+				if err != nil {
+					log.Println("exit server error: ", err.Error())
+				}
+				os.Exit(1)
+			}
+		}
+	}()
 	_ = ser.Serve(listener)
 }
